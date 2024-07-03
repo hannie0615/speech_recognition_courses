@@ -22,6 +22,11 @@ dataset = dataset.remove_columns(
     ["english_transcription", "intent_class", "lang_id"])
 
 
+print(f"MPS 장치를 지원하도록 build가 되었는가? {torch.backends.mps.is_built()}")
+print(f"MPS 장치가 사용 가능한가? {torch.backends.mps.is_available()}")
+device = torch.device("mps")
+
+
 def compute_metrics(pred):
     pred_logits = pred.predictions
     pred_ids = np.argmax(pred_logits, axis=-1)
@@ -40,7 +45,7 @@ def compute_metrics(pred):
 def prepare_dataset(batch):
     audio = batch["audio"]
 
-    batch = processor(audio["array"],
+    batch = processor(audio["array"],     # add device,
                       sampling_rate=audio["sampling_rate"],
                       text=batch["transcription"])
     batch["input_length"] = len(batch["input_values"][0])
@@ -80,7 +85,7 @@ class DataCollatorCTCWithPadding:
         labels = labels_batch["input_ids"].masked_fill(
             labels_batch.attention_mask.ne(1), -100)
 
-        batch["labels"] = labels
+        batch["labels"] = labels.to(device)     # add device
 
         return batch
 
@@ -90,7 +95,6 @@ dataset = dataset.map(uppercase)
 dataset = dataset.map(prepare_dataset,
                       remove_columns=dataset.column_names["train"],
                       num_proc=4)
-
 
 
 data_collator = DataCollatorCTCWithPadding(processor=processor,
@@ -120,7 +124,7 @@ training_args = TrainingArguments(
     warmup_steps=500,
     max_steps=20000,
     gradient_checkpointing=True,
-    fp16=True,
+    fp16=False, # mps 때문에 수정
     group_by_length=True,
     eval_strategy="steps",
     per_device_eval_batch_size=16,
@@ -144,3 +148,4 @@ trainer = Trainer(
 )
 
 trainer.train()
+# trainer.fit()

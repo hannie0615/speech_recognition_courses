@@ -1,0 +1,4 @@
+transformers==4.42.0
+datasets
+tf_keras
+accelerate==0.21.0
